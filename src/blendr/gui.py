@@ -61,15 +61,19 @@ class BlendrApp:
         self.fills: list[Fill] = []
         self.current_path: Path | None = None
 
-        root.geometry("520x620")
-        root.minsize(460, 520)
-
         self._bold_font = tkfont.nametofont("TkDefaultFont").copy()
         self._bold_font.configure(weight="bold")
 
         self._build_menu()
         self._build_widgets()
         self._refresh()
+
+        # Size the window to fit its contents snugly (the input row sets the
+        # minimum width) so there's no wasted space and no clipped controls.
+        root.update_idletasks()
+        min_width = root.winfo_reqwidth()
+        root.minsize(min_width, 300)
+        root.geometry(f"{min_width}x420")
 
     # --- layout ---------------------------------------------------------
 
@@ -92,13 +96,13 @@ class BlendrApp:
     def _build_widgets(self) -> None:
         # Input row.
         input_frame = ttk.Frame(self.root)
-        input_frame.pack(fill="x", padx=10, pady=(10, 2))
+        input_frame.pack(fill="x", padx=6, pady=(6, 1))
         ttk.Label(input_frame, text="Price").grid(row=0, column=0, sticky="w")
-        self.price_entry = ttk.Entry(input_frame, width=14)
-        self.price_entry.grid(row=0, column=1, padx=(4, 14))
-        ttk.Label(input_frame, text="Quantity").grid(row=0, column=2, sticky="w")
-        self.qty_entry = ttk.Entry(input_frame, width=14)
-        self.qty_entry.grid(row=0, column=3, padx=(4, 14))
+        self.price_entry = ttk.Entry(input_frame, width=10)
+        self.price_entry.grid(row=0, column=1, padx=(3, 8))
+        ttk.Label(input_frame, text="Qty").grid(row=0, column=2, sticky="w")
+        self.qty_entry = ttk.Entry(input_frame, width=10)
+        self.qty_entry.grid(row=0, column=3, padx=(3, 8))
         ttk.Button(input_frame, text="Add", command=self._on_add).grid(row=0, column=4)
         for entry in (self.price_entry, self.qty_entry):
             entry.bind("<Return>", lambda _e: self._on_add())
@@ -106,19 +110,19 @@ class BlendrApp:
         # Inline validation message.
         self.error_var = tk.StringVar()
         ttk.Label(self.root, textvariable=self.error_var, foreground="red").pack(
-            fill="x", padx=10
+            fill="x", padx=6
         )
 
         # Fills table.
         table_frame = ttk.Frame(self.root)
-        table_frame.pack(fill="both", expand=True, padx=10, pady=4)
+        table_frame.pack(fill="both", expand=True, padx=6, pady=2)
         columns = ("price", "quantity", "cost")
         self.tree = ttk.Treeview(
             table_frame, columns=columns, show="headings", selectmode="browse"
         )
         for key, heading in zip(columns, ("Price", "Quantity", "Cost")):
             self.tree.heading(key, text=heading)
-            self.tree.column(key, anchor="e", width=150, minwidth=90, stretch=True)
+            self.tree.column(key, anchor="e", width=104, minwidth=60, stretch=True)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=scrollbar.set)
         self.tree.pack(side="left", fill="both", expand=True)
@@ -126,17 +130,24 @@ class BlendrApp:
 
         # Row actions.
         button_frame = ttk.Frame(self.root)
-        button_frame.pack(fill="x", padx=10, pady=4)
+        button_frame.pack(fill="x", padx=6, pady=2)
         ttk.Button(button_frame, text="Remove selected", command=self._on_remove).pack(
             side="left"
         )
         ttk.Button(button_frame, text="Clear all", command=self._on_clear).pack(
-            side="left", padx=8
+            side="left", padx=6
         )
+        self.topmost_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            button_frame,
+            text="Stay on top",
+            variable=self.topmost_var,
+            command=self._on_toggle_topmost,
+        ).pack(side="right")
 
         # Results panel.
         results = ttk.LabelFrame(self.root, text="Position")
-        results.pack(fill="x", padx=10, pady=(4, 12))
+        results.pack(fill="x", padx=6, pady=(2, 6))
         results.columnconfigure(1, weight=1)
         self.avg_var = tk.StringVar()
         self.total_qty_var = tk.StringVar()
@@ -146,9 +157,9 @@ class BlendrApp:
         self._result_row(results, 2, "Total cost:", self.total_cost_var)
 
     def _result_row(self, parent: ttk.LabelFrame, row: int, label: str, var: tk.StringVar) -> None:
-        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=8, pady=3)
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky="w", padx=6, pady=1)
         ttk.Label(parent, textvariable=var, font=self._bold_font, anchor="e").grid(
-            row=row, column=1, sticky="e", padx=8, pady=3
+            row=row, column=1, sticky="e", padx=6, pady=1
         )
 
     # --- actions --------------------------------------------------------
@@ -189,6 +200,9 @@ class BlendrApp:
         self.fills.clear()
         self.error_var.set("")
         self._refresh()
+
+    def _on_toggle_topmost(self) -> None:
+        self.root.attributes("-topmost", self.topmost_var.get())
 
     def _on_open(self) -> None:
         path = filedialog.askopenfilename(title="Open position", filetypes=_FILE_TYPES)
